@@ -11,21 +11,21 @@
 
 <div class="grid grid-cols-12 gap-4 h-screen p-4">
 
-  <!-- LEFT: WATCHLIST -->
+  <!-- LEFT -->
   <div class="col-span-2 bg-[#151e2d] rounded-xl p-3 overflow-y-auto">
     <h2 class="text-xs uppercase text-slate-400 mb-3">Watchlist</h2>
     <div id="watchlist"></div>
   </div>
 
-  <!-- CENTER: CHART -->
-  <div class="flex-grow w-full bg-[#0b111e] relative">
+  <!-- CENTER -->
+  <div class="col-span-7 bg-black rounded-xl overflow-hidden">
     <div id="tv-chart" class="w-full h-full min-h-[400px]"></div>
-</div>
+  </div>
 
-  <!-- RIGHT PANEL -->
+  <!-- RIGHT -->
   <div class="col-span-3 flex flex-col gap-4">
 
-    <!-- TACO ENGINE -->
+    <!-- TACO -->
     <div class="bg-[#151e2d] rounded-xl p-4">
       <h2 class="text-xs uppercase text-slate-400 mb-3">Taco Engine</h2>
       <div id="taco-status" class="text-sm text-yellow-400">Cargando...</div>
@@ -43,56 +43,60 @@
   </div>
 </div>
 
+<!-- TradingView -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
 <script>
 /* =========================
-   🧠 STATE GLOBAL
+   📊 TRADINGVIEW
 ========================= */
-const state = {
-  market: {},
-  listeners: []
+window.tvWidget = new TradingView.widget({
+  "container_id": "tv-chart",
+  "width": "100%",
+  "height": "100%",
+  "symbol": "BINANCE:BTCUSDT",
+  "interval": "15",
+  "theme": "dark",
+  "style": "1",
+  "locale": "es",
+  "toolbar_bg": "#0b111e",
+  "enable_publishing": false,
+  "allow_symbol_change": true,
+  "studies": [
+    "RSI@tv-basicstudies",
+    "MACD@tv-basicstudies"
+  ]
+});
+
+/* =========================
+   🧠 STATE
+========================= */
+const state = { market: {} };
+
+/* =========================
+   🔌 WEBSOCKET
+========================= */
+const socket = new WebSocket(
+  "wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/solusdt@ticker"
+);
+
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data).data;
+
+  state.market[data.s] = {
+    symbol: data.s,
+    price: parseFloat(data.c),
+    change: parseFloat(data.P)
+  };
+
+  renderWatchlist();
 };
 
-function setState(update) {
-  Object.assign(state.market, update);
-  state.listeners.forEach(fn => fn(state));
-}
-
-function subscribe(fn) {
-  state.listeners.push(fn);
-}
+socket.onclose = () => setTimeout(() => location.reload(), 2000);
 
 /* =========================
-   🔌 WEBSOCKET BINANCE
+   📋 WATCHLIST
 ========================= */
-function connectWS() {
-  const socket = new WebSocket(
-    "wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/solusdt@ticker"
-  );
-
-  socket.onmessage = (event) => {
-    const data = JSON.parse(event.data).data;
-
-    setState({
-      [data.s]: {
-        symbol: data.s,
-        price: parseFloat(data.c),
-        change: parseFloat(data.P)
-      }
-    });
-  };
-
-  socket.onclose = () => {
-    console.log("Reconectando WS...");
-    setTimeout(connectWS, 2000);
-  };
-}
-
-connectWS();
-
-/* =========================
-   🧩 COMPONENTES
-========================= */
-
 function renderWatchlist() {
   const container = document.getElementById("watchlist");
   container.innerHTML = "";
@@ -100,7 +104,7 @@ function renderWatchlist() {
   Object.values(state.market).forEach(asset => {
     const el = document.createElement("div");
 
-    el.className = "flex justify-between p-2 border-b border-slate-800 text-sm";
+    el.className = "flex justify-between p-2 border-b border-slate-800 text-sm cursor-pointer hover:bg-slate-800";
 
     el.innerHTML = `
       <span>${asset.symbol}</span>
@@ -110,19 +114,16 @@ function renderWatchlist() {
       </span>
     `;
 
+    el.onclick = () => {
+      window.tvWidget.setSymbol(`BINANCE:${asset.symbol}`, "15");
+    };
+
     container.appendChild(el);
   });
 }
 
 /* =========================
-   🔄 SUBSCRIBE RENDER
-========================= */
-subscribe(() => {
-  renderWatchlist();
-});
-
-/* =========================
-   🌮 TACO ENGINE (SIMULADO)
+   🌮 TACO
 ========================= */
 function updateTaco() {
   const risk = Math.floor(Math.random() * 100);
@@ -141,11 +142,10 @@ function updateTaco() {
     text.className = "text-yellow-400";
   }
 }
-
 setInterval(updateTaco, 3000);
 
 /* =========================
-   🔥 HEATMAP (SIMULADO)
+   🔥 HEATMAP
 ========================= */
 function renderHeatmap() {
   const container = document.getElementById("heatmap");
@@ -165,37 +165,9 @@ function renderHeatmap() {
     container.appendChild(box);
   }
 }
-
 setInterval(renderHeatmap, 5000);
 renderHeatmap();
-
 </script>
 
-<!-- 1. TradingView primero -->
-<script src="https://s3.tradingview.com/tv.js"></script>
-
-<!-- 2. Luego tu app -->
-<script type="module" src="./main.js"></script>
-
-<!-- 3. Luego inicializas el widget -->
-<script>
-new TradingView.widget({
-  "container_id": "tv-chart",
-  "width": "100%",
-  "height": "100%",
-  "symbol": "BINANCE:BTCUSDT",
-  "interval": "15",
-  "theme": "dark",
-  "style": "1",
-  "locale": "es",
-  "toolbar_bg": "#0b111e",
-  "enable_publishing": false,
-  "allow_symbol_change": true,
-  "studies": [
-    "RSI@tv-basicstudies",
-    "MACD@tv-basicstudies"
-  ]
-});
-</script>
 </body>
 </html>
